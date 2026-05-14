@@ -1,0 +1,659 @@
+from pathlib import Path
+from zipfile import ZipFile
+from textwrap import dedent
+
+base = Path("/mnt/data/element_diagnosis")
+base.mkdir(exist_ok=True)
+
+html = dedent("""
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>エレメント診断</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-inner">
+
+      <!-- ロゴ画像差し替え -->
+      <img src="images/logo.png" alt="Logo" class="logo">
+
+      <p class="sub-copy">算命学 × 東洋医学</p>
+
+      <h1>
+        あなたの身体のクセは<br>
+        生まれ持った個性から見えてくる
+      </h1>
+
+      <p class="lead">
+        “今の不調”ではなく、<br>
+        あなた本来の体質タイプを知る診断。
+      </p>
+
+      <button id="startBtn" class="main-btn">
+        診断をはじめる
+      </button>
+    </div>
+  </section>
+
+  <!-- QUIZ -->
+  <section class="quiz-section hidden" id="quizSection">
+
+    <div class="progress-wrap">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <p id="progressText">1 / 5</p>
+    </div>
+
+    <div class="question-card">
+      <h2 id="questionText"></h2>
+
+      <div class="answers" id="answersContainer"></div>
+    </div>
+
+  </section>
+
+  <!-- LOADING -->
+  <section class="loading hidden" id="loadingSection">
+    <div class="loading-box">
+      <div class="loader"></div>
+      <p>あなたのエレメントを解析中…</p>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section class="result hidden" id="resultSection">
+
+    <div class="result-card">
+
+      <p class="result-label">あなたのタイプは</p>
+
+      <h2 id="resultType"></h2>
+
+      <p id="resultCatch" class="result-catch"></p>
+
+      <div class="result-block">
+        <h3>身体傾向</h3>
+        <ul id="bodyList"></ul>
+      </div>
+
+      <div class="result-block">
+        <h3>心の傾向</h3>
+        <ul id="mindList"></ul>
+      </div>
+
+      <div class="result-block">
+        <h3>必要なケア</h3>
+        <ul id="careList"></ul>
+      </div>
+
+    </div>
+
+    <!-- LINE CTA -->
+    <section class="line-section">
+      <p class="line-copy">
+        もっと深く<br>
+        “本来の自分の整え方”を知りたい方へ
+      </p>
+
+      <!-- LINEリンク差し替え -->
+      <a href="https://lin.ee/xxxxxxxx"
+         target="_blank"
+         class="line-btn">
+         公式LINEはこちら
+      </a>
+    </section>
+
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
+""")
+
+css = dedent("""
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  font-family:
+  "Hiragino Sans",
+  "Yu Gothic",
+  sans-serif;
+
+  background:#f8f6f3;
+  color:#333;
+  line-height:1.7;
+}
+
+img{
+  max-width:100%;
+  display:block;
+}
+
+.hidden{
+  display:none;
+}
+
+.hero{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:40px 20px;
+  text-align:center;
+}
+
+.hero-inner{
+  width:100%;
+  max-width:700px;
+}
+
+.logo{
+  width:220px;
+  margin:0 auto 24px;
+}
+
+.sub-copy{
+  letter-spacing:0.2em;
+  font-size:14px;
+  color:#7b7b7b;
+  margin-bottom:20px;
+}
+
+.hero h1{
+  font-size:clamp(30px,5vw,52px);
+  line-height:1.4;
+  margin-bottom:24px;
+  font-weight:500;
+}
+
+.lead{
+  font-size:18px;
+  color:#666;
+  margin-bottom:40px;
+}
+
+.main-btn,
+.answer-btn,
+.line-btn{
+  border:none;
+  cursor:pointer;
+  transition:0.3s;
+}
+
+.main-btn{
+  background:#1f1f1f;
+  color:#fff;
+  width:100%;
+  max-width:340px;
+  height:60px;
+  border-radius:999px;
+  font-size:18px;
+}
+
+.main-btn:hover{
+  transform:translateY(-2px);
+}
+
+.quiz-section{
+  min-height:100vh;
+  padding:30px 20px 60px;
+}
+
+.progress-wrap{
+  width:100%;
+  max-width:700px;
+  margin:0 auto 40px;
+}
+
+.progress-bar{
+  width:100%;
+  height:10px;
+  background:#ddd;
+  border-radius:999px;
+  overflow:hidden;
+  margin-bottom:12px;
+}
+
+.progress-fill{
+  width:0%;
+  height:100%;
+  background:#6f8b8f;
+  transition:0.4s;
+}
+
+#progressText{
+  text-align:right;
+  color:#777;
+}
+
+.question-card{
+  background:#fff;
+  border-radius:28px;
+  padding:40px 24px;
+  width:100%;
+  max-width:700px;
+  margin:0 auto;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05);
+}
+
+.question-card h2{
+  font-size:28px;
+  line-height:1.5;
+  margin-bottom:32px;
+  font-weight:500;
+}
+
+.answers{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+.answer-btn{
+  min-height:64px;
+  border-radius:20px;
+  background:#f3f1ed;
+  font-size:17px;
+  padding:18px;
+}
+
+.answer-btn:hover{
+  background:#dce5e6;
+}
+
+.loading{
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  padding:20px;
+}
+
+.loading-box p{
+  margin-top:24px;
+  font-size:20px;
+}
+
+.loader{
+  width:70px;
+  height:70px;
+  border:6px solid #ddd;
+  border-top:6px solid #6f8b8f;
+  border-radius:50%;
+  margin:auto;
+  animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+  to{
+    transform:rotate(360deg);
+  }
+}
+
+.result{
+  padding:80px 20px;
+}
+
+.result-card{
+  width:100%;
+  max-width:760px;
+  margin:0 auto 60px;
+  background:#fff;
+  border-radius:32px;
+  padding:50px 28px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05);
+}
+
+.result-label{
+  text-align:center;
+  color:#777;
+  margin-bottom:12px;
+}
+
+#resultType{
+  text-align:center;
+  font-size:42px;
+  margin-bottom:20px;
+  font-weight:500;
+}
+
+.result-catch{
+  text-align:center;
+  font-size:20px;
+  color:#555;
+  margin-bottom:40px;
+}
+
+.result-block{
+  margin-bottom:36px;
+}
+
+.result-block h3{
+  font-size:22px;
+  margin-bottom:16px;
+}
+
+.result-block ul{
+  padding-left:20px;
+}
+
+.result-block li{
+  margin-bottom:10px;
+}
+
+.line-section{
+  text-align:center;
+  padding-bottom:60px;
+}
+
+.line-copy{
+  font-size:22px;
+  line-height:1.8;
+  margin-bottom:28px;
+}
+
+.line-btn{
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  width:90%;
+  max-width:360px;
+  height:62px;
+  background:#06C755;
+  color:#fff;
+  text-decoration:none;
+  border-radius:999px;
+  font-size:18px;
+}
+
+@media(max-width:768px){
+
+  .hero{
+    padding:24px 20px;
+  }
+
+  .logo{
+    width:180px;
+  }
+
+  .hero h1{
+    font-size:32px;
+  }
+
+  .lead{
+    font-size:16px;
+  }
+
+  .question-card{
+    padding:32px 20px;
+  }
+
+  .question-card h2{
+    font-size:24px;
+  }
+
+  #resultType{
+    font-size:34px;
+  }
+
+  .result-catch{
+    font-size:18px;
+  }
+
+  .line-copy{
+    font-size:18px;
+  }
+
+}
+""")
+
+js = dedent("""
+const questions = [
+  {
+    question: "疲れた時、どんな状態になりやすい？",
+    answers: [
+      { text: "むくみ・冷え", type: "水" },
+      { text: "イライラ・張り", type: "木" },
+      { text: "胃腸不調", type: "土" },
+      { text: "のぼせ・不眠", type: "火" }
+    ]
+  },
+  {
+    question: "普段の性格で近いものは？",
+    answers: [
+      { text: "感受性が強い", type: "水" },
+      { text: "行動力がある", type: "木" },
+      { text: "安心感を大切にする", type: "土" },
+      { text: "情熱的", type: "火" }
+    ]
+  },
+  {
+    question: "不調が出やすい時は？",
+    answers: [
+      { text: "我慢を続けた時", type: "水" },
+      { text: "ストレスが溜まった時", type: "木" },
+      { text: "食生活が乱れた時", type: "土" },
+      { text: "頑張りすぎた時", type: "火" }
+    ]
+  },
+  {
+    question: "理想の過ごし方は？",
+    answers: [
+      { text: "静かに整える", type: "水" },
+      { text: "挑戦したい", type: "木" },
+      { text: "安心できる空間", type: "土" },
+      { text: "楽しく刺激的", type: "火" }
+    ]
+  },
+  {
+    question: "今一番必要だと思うものは？",
+    answers: [
+      { text: "休息", type: "水" },
+      { text: "発散", type: "木" },
+      { text: "安定", type: "土" },
+      { text: "余裕", type: "火" }
+    ]
+  }
+];
+
+const results = {
+  水: {
+    catch: "感受性が高く、空気や感情を深く受け取る人",
+    body: ["むくみ", "冷え", "疲労蓄積", "睡眠質低下"],
+    mind: ["抱え込みやすい", "我慢しやすい", "エネルギー切れしやすい"],
+    care: ["身体を温める", "睡眠を優先する", "1人時間を確保する"]
+  },
+
+  木: {
+    catch: "行動力と成長欲求が強いエネルギッシュな人",
+    body: ["肩首の張り", "自律神経乱れ", "眼精疲労"],
+    mind: ["頑張りすぎる", "責任感が強い", "ストレスを溜めやすい"],
+    care: ["深呼吸", "運動で巡らせる", "オンオフを分ける"]
+  },
+
+  土: {
+    catch: "安心感と安定を大切にするサポートタイプ",
+    body: ["胃腸疲労", "食欲乱れ", "だるさ"],
+    mind: ["考え込みやすい", "人に合わせすぎる", "不安を抱えやすい"],
+    care: ["胃腸を休める", "生活リズムを整える", "自然に触れる"]
+  },
+
+  火: {
+    catch: "情熱的で人を照らす魅力を持つ人",
+    body: ["のぼせ", "不眠", "動悸", "疲労感"],
+    mind: ["頑張り続ける", "感情が揺れやすい", "無理しやすい"],
+    care: ["休息を増やす", "頭を休める", "夜はデジタルを減らす"]
+  }
+};
+
+let currentQuestion = 0;
+let scores = {
+  水: 0,
+  木: 0,
+  土: 0,
+  火: 0
+};
+
+const startBtn = document.getElementById("startBtn");
+const quizSection = document.getElementById("quizSection");
+const questionText = document.getElementById("questionText");
+const answersContainer = document.getElementById("answersContainer");
+const progressFill = document.getElementById("progressFill");
+const progressText = document.getElementById("progressText");
+
+const loadingSection = document.getElementById("loadingSection");
+const resultSection = document.getElementById("resultSection");
+
+startBtn.addEventListener("click", () => {
+  document.querySelector(".hero").classList.add("hidden");
+  quizSection.classList.remove("hidden");
+
+  showQuestion();
+});
+
+function showQuestion(){
+
+  const q = questions[currentQuestion];
+
+  questionText.textContent = q.question;
+
+  answersContainer.innerHTML = "";
+
+  q.answers.forEach(answer => {
+
+    const button = document.createElement("button");
+
+    button.classList.add("answer-btn");
+
+    button.textContent = answer.text;
+
+    button.addEventListener("click", () => {
+
+      scores[answer.type]++;
+
+      currentQuestion++;
+
+      if(currentQuestion < questions.length){
+
+        showQuestion();
+
+      }else{
+
+        showLoading();
+
+      }
+
+    });
+
+    answersContainer.appendChild(button);
+
+  });
+
+  const progress = ((currentQuestion + 1) / questions.length) * 100;
+
+  progressFill.style.width = progress + "%";
+
+  progressText.textContent =
+  `${currentQuestion + 1} / ${questions.length}`;
+
+}
+
+function showLoading(){
+
+  quizSection.classList.add("hidden");
+
+  loadingSection.classList.remove("hidden");
+
+  setTimeout(() => {
+
+    loadingSection.classList.add("hidden");
+
+    showResult();
+
+  }, 2500);
+
+}
+
+function showResult(){
+
+  resultSection.classList.remove("hidden");
+
+  const topType =
+  Object.keys(scores).reduce((a, b) =>
+  scores[a] > scores[b] ? a : b);
+
+  const result = results[topType];
+
+  document.getElementById("resultType").textContent =
+  `${topType}タイプ`;
+
+  document.getElementById("resultCatch").textContent =
+  result.catch;
+
+  createList("bodyList", result.body);
+  createList("mindList", result.mind);
+  createList("careList", result.care);
+
+}
+
+function createList(id, items){
+
+  const ul = document.getElementById(id);
+
+  ul.innerHTML = "";
+
+  items.forEach(item => {
+
+    const li = document.createElement("li");
+
+    li.textContent = item;
+
+    ul.appendChild(li);
+
+  });
+
+}
+""")
+
+(base / "index.html").write_text(html, encoding="utf-8")
+(base / "style.css").write_text(css, encoding="utf-8")
+(base / "script.js").write_text(js, encoding="utf-8")
+
+(base / "images").mkdir(exist_ok=True)
+
+readme = dedent("""
+使い方
+
+1. imagesフォルダに logo.png を入れる
+2. index.html のLINEリンクを差し替える
+3. GitHubへアップロード
+4. GitHub Pagesで公開
+
+構成
+- index.html
+- style.css
+- script.js
+- images/logo.png
+""")
+
+(base / "README.txt").write_text(readme, encoding="utf-8")
+
+zip_path = "/mnt/data/element_diagnosis_complete.zip"
+
+with ZipFile(zip_path, "w") as zipf:
+    for file in base.rglob("*"):
+        zipf.write(file, file.relative_to(base.parent))
+
+print("完成しました:", zip_path)
